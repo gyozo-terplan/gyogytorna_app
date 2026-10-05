@@ -79,6 +79,7 @@
     <h2 id="pName">Válassz programot</h2>
     <p id="pMeta"></p>
     <p id="pSet"></p>
+    <div id="pAnim" class="animbox"></div>
     <div class="startpos" id="pStart" style="display:none"></div>
     <div id="pSteps"></div>
     <div class="timer" id="pTimer">–</div>
@@ -91,6 +92,7 @@
     <div class="controls">
       <button id="btnRestart">↺ Újra</button>
       <label class="auto"><input type="checkbox" id="autoStep" checked> Automata léptetés</label>
+      <label class="auto"><input type="checkbox" id="animOn" checked> 🎬 Animáció</label>
       <label>Pihenő <select id="restSec"><option>5</option><option selected>10</option><option>15</option><option>20</option></select> mp</label>
     </div>
     <fieldset class="voice">
@@ -107,6 +109,7 @@
 <script src="exercises.js"></script>
 <script src="warmup.js"></script>
 <script src="planner.js"></script>
+<script src="anim.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

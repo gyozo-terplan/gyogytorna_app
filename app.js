@@ -43,6 +43,8 @@ $("btnTestVoice").onclick=()=>speak("Sziasztok! Kezdjük a bemelegítést. Helyb
 // ---------- Körök (sorozatok) ----------
 function setsFor(e){ const o=parseInt($("setCount").value,10); return o>0 ? o : window.exerciseSets(e); }
 $("setCount").onchange=()=>{ renderManual(); buildFromManual(); previewAuto(); };
+try{ const _a=localStorage.getItem("edzesAnim"); if(_a!==null) $("animOn").checked=_a==="1"; }catch(e){}
+$("animOn").onchange=()=>{ try{localStorage.setItem("edzesAnim",$("animOn").checked?"1":"0");}catch(e){} show(); };
 
 // ---------- Lista + kézi ----------
 let manualSel = new Set((store.load()&&store.load().ids)||[1,5,9,13,18,26]);
@@ -76,8 +78,8 @@ $("manualAll").onclick=()=>{ window.EXERCISES.forEach(e=>{if(!$("manualFree").ch
 $("manualNone").onclick=()=>{ manualSel.clear(); renderManual(); buildFromManual(); };
 
 // ---------- Program építés ----------
-function toItemWarmup(w){ return {kind:"warmup", nev:w.nev+" (bemelegítés)", kiindulo:"", steps:w.lepesek, meta:w.ismetles, secs:w.becsultMp, sets:1, tts:w.tts, eszkoz:[]}; }
-function toItemEx(e, warm){ const sets=warm?1:setsFor(e); return {kind:warm?"warmup":"ex", nev:e.nev+(warm?" (bemelegítés, rövidített)":""), kiindulo:e.kiindulo||"", steps:e.lepesek, meta:(warm?"rövidített • ":"")+window.setsLabel(sets)+e.ismetles, secs:warm?Math.max(45,Math.round(e.becsultMp/2)):e.becsultMp, sets, tts:e.tts, eszkoz:e.eszkoz}; }
+function toItemWarmup(w){ return {kind:"warmup", exId:w.id, nev:w.nev+" (bemelegítés)", kiindulo:"", steps:w.lepesek, meta:w.ismetles, secs:w.becsultMp, sets:1, tts:w.tts, eszkoz:[]}; }
+function toItemEx(e, warm){ const sets=warm?1:setsFor(e); return {kind:warm?"warmup":"ex", exId:e.id, nev:e.nev+(warm?" (bemelegítés, rövidített)":""), kiindulo:e.kiindulo||"", steps:e.lepesek, meta:(warm?"rövidített • ":"")+window.setsLabel(sets)+e.ismetles, secs:warm?Math.max(45,Math.round(e.becsultMp/2)):e.becsultMp, sets, tts:e.tts, eszkoz:e.eszkoz}; }
 function warmupItems(){ return [...window.WARMUP_GENERIC.map(toItemWarmup), ...[1,2,3,4].map(id=>toItemEx(PLANNER.byId(id),true))]; }
 
 let program=[]; // {nev,steps,meta,secs,tts,eszkoz,kind}
@@ -146,6 +148,24 @@ function show(){
   else { st.style.display="none"; st.innerHTML=""; }
   $("pSteps").innerHTML=inRest?"":"<ol>"+p.steps.map(s=>`<li>${s}</li>`).join("")+"</ol>";
   $("pTimer").textContent=fmt(remaining);
+  $("pTimer").classList.remove("urgent");
+  const pA=$("pAnim");
+  if($("animOn").checked){
+    const t=inRest?"breath":(window.ANIM_MAP? (window.ANIM_MAP[p.exId]||"pulse") : "pulse");
+    const key=t+(inRest?"R":"")+idx;
+    if(pA.dataset.t!==key){ window.renderAnim(pA,t); pA.dataset.t=key; }
+    pA.style.display="";
+  } else { pA.style.display="none"; pA.dataset.t=""; }
+  updateSteps();
+}
+let elapsed=0;
+function updateSteps(){
+  const p=program[idx]; if(!p) return;
+  const lis=$("pSteps").querySelectorAll("li"); if(!lis.length) return;
+  if(inRest){ lis.forEach(li=>li.classList.remove("active")); return; }
+  const per=p.secs/Math.max(1,p.steps.length);
+  const k=Math.min(lis.length-1,Math.floor(elapsed/per));
+  lis.forEach((li,i)=>li.classList.toggle("active",i===k));
 }
 function fmt(s){ s=Math.max(0,Math.round(s)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; }
 function stopTick(){ if(tick)clearInterval(tick); tick=null; }
@@ -153,9 +173,10 @@ function runTick(onDone){
   stopTick();
   tick=setInterval(()=>{
     if(paused) return;
-    remaining--;
+    remaining--; elapsed++;
     $("pTimer").textContent=fmt(remaining);
-    if(remaining<=3&&remaining>0) speak(String(remaining));
+    updateSteps();
+    if(remaining<=3&&remaining>0){ $("pTimer").classList.add("urgent"); speak(String(remaining)); }
     if(remaining<=0){ stopTick(); onDone(); }
   },1000);
 }
@@ -175,7 +196,7 @@ function startAt(i, announce){
   if(!program.length){ goTab("ossze"); return; }
   idx=Math.max(0,Math.min(i,program.length-1)); setIdx=1;
   inRest=false; restKind=""; paused=false; $("btnPause").textContent="⏸ Szünet";
-  remaining=program[idx].secs; show();
+  remaining=program[idx].secs; elapsed=0; show();
   if(announce) announceCurrent();
   if($("autoStep").checked) runTick(()=>nextSetOrNext());
   else { stopTick(); }
@@ -185,30 +206,30 @@ function nextSetOrNext(){
   // Automata módban egy kör lejárt: van még kör hátra?
   const p=program[idx];
   if(setIdx<p.sets){
-    inRest=true; restKind="set"; remaining=5; show();
+    inRest=true; restKind="set"; remaining=5; elapsed=0; show();
     speak(`Pihenő. Jön a ${korNev(setIdx+1).toLowerCase()} kör.`);
-    runTick(()=>{ setIdx++; inRest=false; restKind=""; remaining=p.secs; show(); announceSet(); runTick(()=>nextSetOrNext()); });
+    runTick(()=>{ setIdx++; inRest=false; restKind=""; remaining=p.secs; elapsed=0; show(); announceSet(); runTick(()=>nextSetOrNext()); });
   } else goRestOrNext();
 }
 function goRestOrNext(){
   if(idx+1>=program.length){ speak("Gratulálok! Végeztél az edzéssel."); $("progBar").style.width="100%"; $("pName").textContent="✅ Kész!"; return; }
   const rest=parseInt($("restSec").value,10);
-  inRest=true; restKind="ex"; remaining=rest; show();
+  inRest=true; restKind="ex"; remaining=rest; elapsed=0; show();
   speak(`Pihenő. Következő: ${program[idx+1].nev}.`);
-  runTick(()=>{ idx++; setIdx=1; inRest=false; restKind=""; remaining=program[idx].secs; show(); announceCurrent(); runTick(()=>nextSetOrNext()); });
+  runTick(()=>{ idx++; setIdx=1; inRest=false; restKind=""; remaining=program[idx].secs; elapsed=0; show(); announceCurrent(); runTick(()=>nextSetOrNext()); });
 }
 function nextPress(){
   // Kézi léptetés: előbb a hátralévő körök, aztán a következő gyakorlat.
   if(!program.length) return;
   speechSynthesis&&speechSynthesis.cancel(); stopTick();
   const p=program[idx];
-  if(setIdx<p.sets){ setIdx++; inRest=false; restKind=""; remaining=p.secs; show(); announceSet(); if($("autoStep").checked) runTick(()=>nextSetOrNext()); }
+  if(setIdx<p.sets){ setIdx++; inRest=false; restKind=""; remaining=p.secs; elapsed=0; show(); announceSet(); if($("autoStep").checked) runTick(()=>nextSetOrNext()); }
   else if(idx+1<program.length){ startAt(idx+1,true); }
   else { speak("Gratulálok! Végeztél az edzéssel."); $("progBar").style.width="100%"; $("pName").textContent="✅ Kész!"; }
 }
 $("btnNext").onclick=nextPress;
 $("btnPrev").onclick=()=>{ speechSynthesis&&speechSynthesis.cancel(); stopTick(); startAt(Math.max(0,idx-1),true); };
-$("btnRestart").onclick=()=>{ if(!program.length) return; stopTick(); inRest=false; restKind=""; remaining=program[idx].secs; show(); announceSet(); if($("autoStep").checked) runTick(()=>nextSetOrNext()); };
+$("btnRestart").onclick=()=>{ if(!program.length) return; stopTick(); inRest=false; restKind=""; remaining=program[idx].secs; elapsed=0; show(); announceSet(); if($("autoStep").checked) runTick(()=>nextSetOrNext()); };
 $("btnSpeak").onclick=()=>announceCurrent();
 $("btnPause").onclick=()=>{ paused=!paused; $("btnPause").textContent=paused?"▶ Folytatás":"⏸ Szünet"; if(paused)speechSynthesis&&speechSynthesis.cancel(); };
 

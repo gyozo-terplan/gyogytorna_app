@@ -24,3 +24,19 @@ button.primary{background:#0e6e5c;color:#fff;border:0}button.big{width:100%;font
 .controls{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.controls button{flex:1;min-width:100px}
 .voice{margin-top:12px;border-radius:10px;display:grid;gap:8px}
 #search{flex:1;padding:10px;border-radius:10px;border:1px solid #ccd}
+.animbox{background:#eef6f3;border-radius:12px;padding:8px;margin:8px 0;text-align:center}
+.anim-svg{width:100%;max-width:340px;height:auto}
+.anim-svg .fig{fill:none;stroke:#0e6e5c;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.anim-svg .figfill{fill:#0e6e5c33;stroke:#0e6e5c;stroke-width:4}
+.anim-svg .head{fill:#0e6e5c;stroke:none}
+.anim-svg .ground{stroke:#b9cdc7;stroke-width:2;stroke-linecap:round}
+.anim-svg .level{stroke:#0e6e5c;stroke-width:1.5;stroke-dasharray:6 5;opacity:.5;fill:none}
+.anim-svg text{font-size:13px;fill:#0e6e5c;font-weight:600}
+.br-in{animation:brIn var(--d,8s) ease-in-out infinite}
+.br-out{animation:brOut var(--d,8s) ease-in-out infinite}
+@keyframes brIn{0%,45%{opacity:1}55%,100%{opacity:0}}
+@keyframes brOut{0%,45%{opacity:0}55%,100%{opacity:1}}
+#pSteps li{padding:2px 6px;border-radius:6px;transition:background .3s}
+#pSteps li.active{background:#fff3d6;font-weight:700}
+#pTimer.urgent{color:#c0392b;animation:pulse 1s infinite}
+@keyframes pulse{50%{transform:scale(1.15)}}
