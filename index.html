@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gyógytorna Edzés</title>
 <link rel="stylesheet" href="style.css">
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
 </head>
 <body>
 <header>
@@ -80,6 +86,7 @@
     <p id="pMeta"></p>
     <p id="pSet"></p>
     <div id="pAnim" class="animbox"></div>
+    <div id="p3d" class="animbox3d" style="display:none"></div>
     <div class="startpos" id="pStart" style="display:none"></div>
     <div id="pSteps"></div>
     <div class="timer" id="pTimer">–</div>
@@ -92,7 +99,11 @@
     <div class="controls">
       <button id="btnRestart">↺ Újra</button>
       <label class="auto"><input type="checkbox" id="autoStep" checked> Automata léptetés</label>
-      <label class="auto"><input type="checkbox" id="animOn" checked> 🎬 Animáció</label>
+      <label class="auto">🎬 <select id="animMode">
+        <option value="3d" selected>3D manöken</option>
+        <option value="2d">2D figura</option>
+        <option value="off">Animáció ki</option>
+      </select></label>
       <label>Pihenő <select id="restSec"><option>5</option><option selected>10</option><option>15</option><option>20</option></select> mp</label>
     </div>
     <fieldset class="voice">
@@ -110,6 +121,9 @@
 <script src="warmup.js"></script>
 <script src="planner.js"></script>
 <script src="anim.js"></script>
+<script src="poses3d_1.js"></script>
+<script src="poses3d_2.js"></script>
+<script type="module" src="player3d.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

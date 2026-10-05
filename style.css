@@ -25,6 +25,8 @@ button.primary{background:#0e6e5c;color:#fff;border:0}button.big{width:100%;font
 .voice{margin-top:12px;border-radius:10px;display:grid;gap:8px}
 #search{flex:1;padding:10px;border-radius:10px;border:1px solid #ccd}
 .animbox{background:#eef6f3;border-radius:12px;padding:8px;margin:8px 0;text-align:center}
+.animbox3d{background:#e9eff2;border-radius:12px;margin:8px 0;height:300px;overflow:hidden;touch-action:none}
+.animbox3d canvas{width:100%!important;height:100%!important;display:block}
 .anim-svg{width:100%;max-width:340px;height:auto}
 .anim-svg .fig{fill:none;stroke:#0e6e5c;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
 .anim-svg .figfill{fill:#0e6e5c33;stroke:#0e6e5c;stroke-width:4}

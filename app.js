@@ -43,8 +43,16 @@ $("btnTestVoice").onclick=()=>speak("Sziasztok! Kezdjük a bemelegítést. Helyb
 // ---------- Körök (sorozatok) ----------
 function setsFor(e){ const o=parseInt($("setCount").value,10); return o>0 ? o : window.exerciseSets(e); }
 $("setCount").onchange=()=>{ renderManual(); buildFromManual(); previewAuto(); };
-try{ const _a=localStorage.getItem("edzesAnim"); if(_a!==null) $("animOn").checked=_a==="1"; }catch(e){}
-$("animOn").onchange=()=>{ try{localStorage.setItem("edzesAnim",$("animOn").checked?"1":"0");}catch(e){} show(); };
+function animMode(){ const m=$("animMode").value; return (m==="3d"||m==="2d"||m==="off")?m:"3d"; }
+let no3d=false, lastPose3d="";
+function setAnimMode(m){ try{localStorage.setItem("edzesAnimMode",m);}catch(e){} no3d=false; lastPose3d=""; show(); }
+try{
+  const _m=localStorage.getItem("edzesAnimMode");
+  if(_m) $("animMode").value=_m;
+  else if(localStorage.getItem("edzesAnim")==="0") $("animMode").value="off";
+}catch(e){}
+$("animMode").onchange=()=>setAnimMode($("animMode").value);
+window.addEventListener("player3d-ready",()=>{ no3d=false; lastPose3d=""; if(animMode()==="3d") show(); });
 
 // ---------- Lista + kézi ----------
 let manualSel = new Set((store.load()&&store.load().ids)||[1,5,9,13,18,26]);
@@ -149,23 +157,39 @@ function show(){
   $("pSteps").innerHTML=inRest?"":"<ol>"+p.steps.map(s=>`<li>${s}</li>`).join("")+"</ol>";
   $("pTimer").textContent=fmt(remaining);
   $("pTimer").classList.remove("urgent");
-  const pA=$("pAnim");
-  if($("animOn").checked){
-    const t=inRest?"breath":(window.ANIM_MAP? (window.ANIM_MAP[p.exId]||"pulse") : "pulse");
-    const key=t+(inRest?"R":"")+idx;
-    if(pA.dataset.t!==key){ window.renderAnim(pA,t); pA.dataset.t=key; }
-    pA.style.display="";
-  } else { pA.style.display="none"; pA.dataset.t=""; }
   updateSteps();
 }
 let elapsed=0;
 function updateSteps(){
   const p=program[idx]; if(!p) return;
-  const lis=$("pSteps").querySelectorAll("li"); if(!lis.length) return;
-  if(inRest){ lis.forEach(li=>li.classList.remove("active")); return; }
-  const per=p.secs/Math.max(1,p.steps.length);
-  const k=Math.min(lis.length-1,Math.floor(elapsed/per));
-  lis.forEach((li,i)=>li.classList.toggle("active",i===k));
+  const lis=$("pSteps").querySelectorAll("li");
+  let k=0;
+  if(!inRest&&lis.length){
+    const per=p.secs/Math.max(1,p.steps.length);
+    k=Math.min(lis.length-1,Math.floor(elapsed/per));
+    lis.forEach((li,i)=>li.classList.toggle("active",i===k));
+  } else lis.forEach(li=>li.classList.remove("active"));
+  renderVisual(k);
+}
+function renderVisual(k){
+  const p=program[idx]; if(!p) return;
+  const pA=$("pAnim"), p3=$("p3d");
+  const key=(inRest?"R":"")+idx+":"+k;
+  if(animMode()==="3d" && !no3d && window.Player3D){
+    let ok=false;
+    if(key!==lastPose3d){
+      ok = inRest ? window.Player3D.rest(p3) : window.Player3D.show(p3, p.exId, k);
+      if(ok) lastPose3d=key; else no3d=true;
+    } else ok=true;
+    if(ok){ p3.style.display=""; pA.style.display="none"; pA.dataset.t=""; return; }
+  }
+  // 2D figura vagy kikapcsolt animáció
+  p3.style.display="none";
+  if(animMode()!=="off" && !inRest && window.renderAnim){
+    const t=window.ANIM_MAP ? (window.ANIM_MAP[p.exId]||"pulse") : "pulse";
+    if(pA.dataset.t!==t+idx){ window.renderAnim(pA,t); pA.dataset.t=t+idx; }
+    pA.style.display="";
+  } else { pA.style.display="none"; pA.dataset.t=""; }
 }
 function fmt(s){ s=Math.max(0,Math.round(s)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; }
 function stopTick(){ if(tick)clearInterval(tick); tick=null; }
