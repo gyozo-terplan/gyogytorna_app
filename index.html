@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gyógytorna Edzés</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>🤸 Gyógytorna Edzés</h1>
+  <nav>
+    <button data-tab="lista" class="active">Gyakorlatok</button>
+    <button data-tab="ossze">Összeállító</button>
+    <button data-tab="jatszo">▶ Lejátszó <span id="navCount"></span></button>
+  </nav>
+</header>
+
+<main>
+<!-- LISTA -->
+<section id="tab-lista" class="tab active">
+  <div class="toolbar">
+    <label><input type="checkbox" id="filterFree"> Csak eszköz nélkül</label>
+    <input type="search" id="search" placeholder="Keresés…">
+  </div>
+  <div id="exerciseList"></div>
+</section>
+
+<!-- ÖSSZEÁLLÍTÓ -->
+<section id="tab-ossze" class="tab">
+  <h2>Kézi összeállítás</h2>
+  <div class="toolbar">
+    <label><input type="checkbox" id="withWarmup" checked> Bemelegítéssel indul</label>
+    <label><input type="checkbox" id="manualFree"> Csak eszköz nélküliek</label>
+    <button id="manualAll">Mind kijelöl</button>
+    <button id="manualNone">Törlés</button>
+  </div>
+  <div id="manualList"></div>
+
+  <h2>Automatikus összeállító</h2>
+  <div class="auto-grid" id="autoGrid"></div>
+  <div class="toolbar">
+    <label>Időkeret:
+      <select id="autoPerc">
+        <option value="15" selected>15 perc</option>
+        <option value="20">20 perc</option>
+        <option value="30">30 perc</option>
+        <option value="40">40 perc</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="autoWarmup" checked> Bemelegítés</label>
+    <label><input type="checkbox" id="autoFree"> Csak eszköz nélkül</label>
+  </div>
+  <div id="autoPreview" class="preview"></div>
+  <div class="toolbar">
+    <button id="btnShuffle">🎲 Újrakeverem</button>
+    <button id="btnAccept" class="primary">✔ Elfogadom, indul az edzés</button>
+  </div>
+
+  <h2>Aktuális program</h2>
+  <div id="programInfo"></div>
+  <ol id="programList"></ol>
+  <button id="btnStart" class="primary big">▶ Edzés indítása hanggal</button>
+</section>
+
+<!-- LEJÁTSZÓ -->
+<section id="tab-jatszo" class="tab">
+  <div class="player">
+    <div class="progress"><div id="progBar"></div></div>
+    <p id="progText"></p>
+    <h2 id="pName">Válassz programot</h2>
+    <p id="pMeta"></p>
+    <div id="pSteps"></div>
+    <div class="timer" id="pTimer">–</div>
+    <div class="controls">
+      <button id="btnPrev">⏮ Előző</button>
+      <button id="btnSpeak" title="Felolvas">🔊</button>
+      <button id="btnPause">⏸ Szünet</button>
+      <button id="btnNext" class="primary">Következő ⏭</button>
+    </div>
+    <div class="controls">
+      <button id="btnRestart">↺ Újra</button>
+      <label class="auto"><input type="checkbox" id="autoStep" checked> Automata léptetés</label>
+      <label>Pihenő <select id="restSec"><option>5</option><option selected>10</option><option>15</option><option>20</option></select> mp</label>
+    </div>
+    <fieldset class="voice">
+      <legend>🔊 Magyar hang</legend>
+      <label><input type="checkbox" id="voiceOn" checked> Beszéd bekapcsolva</label>
+      <label>Sebesség <input type="range" id="voiceRate" min="0.7" max="1.3" step="0.1" value="1"></label>
+      <select id="voiceSelect"></select>
+      <button id="btnTestVoice">Próba: „Kezdjük a bemelegítést"</button>
+    </fieldset>
+  </div>
+</section>
+</main>
+
+<script src="exercises.js"></script>
+<script src="warmup.js"></script>
+<script src="planner.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
