@@ -25,7 +25,10 @@ button.primary{background:#0e6e5c;color:#fff;border:0}button.big{width:100%;font
 .voice{margin-top:12px;border-radius:10px;display:grid;gap:8px}
 #search{flex:1;padding:10px;border-radius:10px;border:1px solid #ccd}
 .animbox{background:#eef6f3;border-radius:12px;padding:8px;margin:8px 0;text-align:center}
-.animbox3d{background:#e9eff2;border-radius:12px;margin:8px 0;height:300px;overflow:hidden;touch-action:none}
+.animbox3d{background:linear-gradient(#f2f6f9,#e3edee);border:1px solid #d5e2e5;border-radius:16px;margin:8px 0;height:440px;overflow:hidden;touch-action:none}
+.visual-status{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:.88rem;color:#34566a;margin-top:12px}
+.visual-status button{font-size:.88rem}
+@media(max-width:540px){.animbox3d{height:380px}}
 .animbox3d canvas{width:100%!important;height:100%!important;display:block}
 .anim-svg{width:100%;max-width:340px;height:auto}
 .anim-svg .fig{fill:none;stroke:#0e6e5c;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}

@@ -2,6 +2,7 @@
 // Betöltése csak akkor történik meg, ha van internet + WebGL; egyébként az app 2D-re esik vissza.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { buildHuman } from './human-model.js?v=human-2';
 
 const D2R = Math.PI / 180;
 // Ízületi határok (fok) — védenek a természetellenes pózoktól
@@ -26,14 +27,16 @@ const BASES = {
 };
 // Kamera nézet bázisonként: [azimut°, pólus°, táv, cél-magasság]
 const CAMS = {
-  stand:[25,72,3.6,0.95], supine:[90,66,3.6,0.25], prone:[90,66,3.6,0.25],
-  sideR:[90,66,3.6,0.25], sideL:[90,66,3.6,0.25], table:[90,64,3.6,0.45]
+  stand:[28,78,3.0,0.92], supine:[62,52,3.3,0.25], prone:[62,52,3.3,0.25],
+  sideR:[58,55,3.3,0.25], sideL:[122,55,3.3,0.25], table:[60,65,3.2,0.45]
 };
 
 let renderer = null, scene = null, camera = null, controls = null;
 let rig = null, container = null, rafId = 0, clockT = 0;
 let cur = null, tgt = null, curEx = null, camTween = null;
 let ballProp = null;
+let ready = false, resizeObserver = null, lastTime = 0;
+let viewBase = 'stand', viewOverride = null;
 
 function clampPose(j){
   const out = {};
@@ -46,72 +49,23 @@ function clampPose(j){
 }
 function blankJoints(){ const o={}; for(const k of JOINTS) o[k]=[0,0,0]; return o; }
 
-function limb(r, len, mat){
-  const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 6, 12), mat);
-  m.position.y = -(len/2 + r*0.5);
-  return m;
-}
-function buildRig(){
-  // Emberszerű manöken: ruha (trikó/nadrág) + bőrszín elkülönítéssel,
-  // látható vállövvel (kulcscsont + deltoid + trapézizom).
-  const cloth = new THREE.MeshStandardMaterial({ color:0x0e6e5c, roughness:0.75 });
-  const clothD = new THREE.MeshStandardMaterial({ color:0x0a4a49, roughness:0.8 });
-  const skin = new THREE.MeshStandardMaterial({ color:0xe8b98a, roughness:0.7 });
-  const R = {};
-  const root = new THREE.Group(); root.position.set(0,0.95,0); R.root = root;
-  // medence / nadrág
-  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 16), clothD);
-  pelvis.scale.set(1.15, 0.8, 0.9); root.add(pelvis);
-  const mk = (parent, x,y,z) => { const g = new THREE.Group(); g.position.set(x,y,z); parent.add(g); return g; };
-  R.spine = mk(root, 0,0.10,0);
-  const belly = new THREE.Mesh(new THREE.CapsuleGeometry(0.105, 0.12, 6, 12), cloth);
-  belly.position.y = 0.08; R.spine.add(belly);
-  R.chest = mk(R.spine, 0,0.22,0);
-  // mellkas: szélesebb, laposabb (emberi torzó)
-  const chest = new THREE.Mesh(new THREE.SphereGeometry(0.14, 20, 16), cloth);
-  chest.scale.set(1.25, 1.05, 0.8); chest.position.y = 0.10; R.chest.add(chest);
-  // trapézizom: nyaktól a vállakig futó sáv
-  const trap = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.07, 0.11), cloth);
-  trap.position.y = 0.20; R.chest.add(trap);
-  // kulcscsont
-  const clav = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.30, 4, 10), clothD);
-  clav.rotation.z = Math.PI/2; clav.position.y = 0.185; R.chest.add(clav);
-  R.neck = mk(R.chest, 0,0.24,0);
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.055,0.09,12), skin);
-  neck.position.y = 0.045; R.neck.add(neck);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.115, 22, 18), skin);
-  head.position.y = 0.175; R.neck.add(head);
-  for(const s of ["L","R"]){
-    const sx = s==="L" ? 1 : -1;
-    const sh = mk(R.chest, 0.24*sx, 0.18, 0); R["sh"+s] = sh;
-    // deltoid (vállizom sapka) — ettől lesz látható válla
-    const delt = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 12), cloth);
-    sh.add(delt);
-    const ua = limb(0.05, 0.20, cloth); sh.add(ua); // felkar (ujj)
-    const el = mk(sh, 0,-0.30,0); R["el"+s] = el;
-    const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 10), skin);
-    el.add(elbow);
-    const fa = limb(0.042, 0.18, skin); el.add(fa); // alkar (bőr)
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.052, 12, 10), skin);
-    hand.position.y = -0.30; hand.scale.set(0.9, 1.2, 0.9); el.add(hand);
-    const hip = mk(root, 0.11*sx, -0.04, 0); R["hip"+s] = hip;
-    const th = limb(0.075, 0.28, clothD); hip.add(th); // comb (nadrág)
-    const knee = mk(hip, 0,-0.44,0); R["knee"+s] = knee;
-    const kneecap = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 10), skin);
-    kneecap.position.z = 0.02; knee.add(kneecap);
-    const sh2 = limb(0.055, 0.28, skin); knee.add(sh2); // lábszár (bőr)
-    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.095,0.06,0.24), clothD);
-    foot.position.set(0,-0.45,0.07); knee.add(foot);
-  }
-  return R;
-}
-
 function ensure(box){
-  if(renderer) return true;
+  if(ready) return true;
   container = box;
   renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.18;
   box.appendChild(renderer.domElement);
+  renderer.domElement.setAttribute('role', 'img');
+  renderer.domElement.setAttribute('aria-label', 'Térbeli embermodell, formázott törzzsel és vállakkal');
+  renderer.domElement.addEventListener('webglcontextlost', event => {
+    event.preventDefault();
+    dispose();
+    window.dispatchEvent(new CustomEvent('player3d-failed', { detail: 'webgl' }));
+  });
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(42, 1, 0.1, 60);
   camera.position.set(2.5, 1.6, 2.5);
@@ -120,30 +74,43 @@ function ensure(box){
   controls.enablePan = false;
   controls.minDistance = 2; controls.maxDistance = 7;
   controls.maxPolarAngle = 1.52;
-  controls.autoRotate = true; controls.autoRotateSpeed = 0.7;
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x9db8b0, 1.2));
-  const dir = new THREE.DirectionalLight(0xffffff, 2.4);
+  controls.autoRotate = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  controls.autoRotateSpeed = 0.35;
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x849ba3, 1.5));
+  const dir = new THREE.DirectionalLight(0xfff2e6, 3);
   dir.position.set(2.5, 4.5, 2); scene.add(dir);
+  dir.castShadow = true;
+  dir.shadow.mapSize.set(1024, 1024);
+  Object.assign(dir.shadow.camera, { left:-2, right:2, top:2, bottom:-2, near:0.1, far:12 });
+  dir.shadow.normalBias = 0.025;
+  const fill = new THREE.DirectionalLight(0xd6efff, 1.7);
+  fill.position.set(-3, 2, -2); scene.add(fill);
   const ground = new THREE.Mesh(new THREE.CircleGeometry(9, 40),
     new THREE.MeshStandardMaterial({ color:0xdfe7e4, roughness:1 }));
   ground.rotation.x = -Math.PI/2; scene.add(ground);
+  ground.receiveShadow = true;
   const mat = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.04, 2.3),
     new THREE.MeshStandardMaterial({ color:0xcfe0da, roughness:0.95 }));
   mat.position.y = 0.02; scene.add(mat);
+  mat.receiveShadow = true;
   ballProp = new THREE.Mesh(new THREE.SphereGeometry(0.30, 24, 18),
     new THREE.MeshStandardMaterial({ color:0xe67e22, roughness:0.6 }));
   ballProp.position.set(0, 0.32, 1.05); ballProp.visible = false; scene.add(ballProp);
-  rig = buildRig(); scene.add(rig.root);
+  rig = buildHuman(); scene.add(rig.root);
   cur = { root:{ p:[0,0.95,0], r:[0,0,0] }, j:blankJoints() };
   tgt = JSON.parse(JSON.stringify(cur));
   const resize = () => {
     const w = box.clientWidth || 300, h = box.clientHeight || 300;
     renderer.setSize(w, h, false); camera.aspect = w/h; camera.updateProjectionMatrix();
+    setCam(viewBase, viewOverride);
   };
-  new ResizeObserver(resize).observe(box); resize();
-  const loop = () => {
+  resizeObserver = new ResizeObserver(resize); resizeObserver.observe(box); resize();
+  const loop = (time = performance.now()) => {
     rafId = requestAnimationFrame(loop);
-    const dt = Math.min(0.05, 1/60); clockT += dt;
+    const dt = Math.min(0.05, Math.max(0, (time - (lastTime || time)) / 1000));
+    lastTime = time;
+    if(!box.getClientRects().length || document.hidden) return;
+    clockT += dt;
     const k = 1 - Math.exp(-3.5*dt);
     for(const ax of [0,1,2]){
       cur.root.p[ax] += (tgt.root.p[ax]-cur.root.p[ax])*k;
@@ -164,16 +131,33 @@ function ensure(box){
       camera.position.lerp(camTween.pos, 0.06);
       if(camera.position.distanceTo(camTween.pos) < 0.02) camTween = null;
     }
-    controls.update();
+    controls.update(dt);
     renderer.render(scene, camera);
   };
   loop();
+  ready = true;
   return true;
 }
 
+function dispose(){
+  cancelAnimationFrame(rafId);
+  resizeObserver?.disconnect();
+  controls?.dispose();
+  scene?.traverse(o => {
+    o.geometry?.dispose();
+    o.skeleton?.dispose();
+    if(o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose());
+  });
+  renderer?.dispose();
+  renderer?.domElement.remove();
+  renderer = null; ready = false; curEx = null; lastTime = 0;
+}
+
 function setCam(base, override){
+  viewBase = base; viewOverride = override;
   const c = override || CAMS[base] || CAMS.stand;
-  const [az, pol, d, ty] = c;
+  const [az, pol, distance, ty] = c;
+  const d = distance * Math.max(1, (base === 'stand' ? 0.85 : 1.15) / camera.aspect);
   const a = az*D2R, p = pol*D2R;
   camTween = {
     tgt: new THREE.Vector3(0, ty, 0),
@@ -189,6 +173,8 @@ function applyBase(base){
 }
 
 const api = {
+  modelVersion: 'human-2',
+  retry: dispose,
   show(box, exId, stepIdx){
     let P = null;
     try{
@@ -197,19 +183,21 @@ const api = {
       if(!P) return false;
       if(curEx !== exId){
         curEx = exId;
-        applyBase(P.base);
         setCam(P.base, P.cam);
         ballProp.visible = (exId===22 || exId===23);
       }
-      const st = P.steps[Math.min(stepIdx, P.steps.length-1)] || {};
-      if(st.root){
-        if(st.root.p) tgt.root.p = st.root.p.slice();
-        if(st.root.r) tgt.root.r = st.root.r.slice();
+      // Későn betöltődő modell és újraindítás esetén is ugyanaz a teljes póz álljon elő.
+      applyBase(P.base);
+      for(const st of P.steps.slice(0, Math.min(stepIdx, P.steps.length-1) + 1)){
+        if(st.root){
+          if(st.root.p) tgt.root.p = st.root.p.slice();
+          if(st.root.r) tgt.root.r = st.root.r.slice();
+        }
+        const sj = clampPose({...tgt.j, ...st.j});
+        for(const jn of JOINTS) tgt.j[jn] = sj[jn].slice();
       }
-      const sj = clampPose(Object.assign({}, (()=>{const o={}; for(const jn of JOINTS)o[jn]=tgt.j[jn]; return o;})(), st.j||{}));
-      for(const jn of JOINTS) tgt.j[jn] = sj[jn].slice();
       return true;
-    }catch(e){ return false; }
+    }catch(e){ console.error('3D megjelenítés:', e); dispose(); return false; }
   },
   rest(box){
     try{
@@ -224,7 +212,7 @@ const api = {
       const s = (Math.sin(Date.now()/2400)+1)/2;
       tgt.j.shL = [-150*s-10, 0, 8]; tgt.j.shR = [-150*s-10, 0, -8];
       return true;
-    }catch(e){ return false; }
+    }catch(e){ console.error('3D megjelenítés:', e); dispose(); return false; }
   }
 };
 window.Player3D = api;

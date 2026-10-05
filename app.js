@@ -53,6 +53,14 @@ try{
 }catch(e){}
 $("animMode").onchange=()=>setAnimMode($("animMode").value);
 window.addEventListener("player3d-ready",()=>{ no3d=false; lastPose3d=""; if(animMode()==="3d") show(); });
+window.addEventListener("player3d-loading",()=>{ if(animMode()==="3d") show(); });
+window.addEventListener("player3d-failed",()=>{ no3d=true; lastPose3d=""; if(animMode()==="3d") show(); });
+$("retry3d").onclick=()=>{
+  $("animMode").value="3d";
+  no3d=false; lastPose3d="";
+  if(window.Player3D){ window.Player3D.retry(); show(); }
+  else window.loadPlayer3D?.();
+};
 
 // ---------- Lista + kézi ----------
 let manualSel = new Set((store.load()&&store.load().ids)||[1,5,9,13,18,26]);
@@ -144,7 +152,6 @@ function korNev(n){ return KOR_NEV[n]||`${n}.`; }
 function show(){
   const p=program[idx];
   if(!p){ $("pName").textContent="Válassz programot az Összeállítóban."; return; }
-  lastVoiceKey="";
   $("progBar").style.width=((idx)/program.length*100)+"%";
   $("progText").textContent=`${idx+1}. / ${program.length}${inRest?(restKind==="set"?" • KÖRKÖZI PIHENŐ":" • PIHENŐ"):""}`;
   if(inRest&&restKind==="set") $("pName").textContent="Körközi pihenő — "+p.nev;
@@ -163,6 +170,7 @@ function show(){
 let elapsed=0, lastVoiceKey="";
 function updateSteps(){
   const p=program[idx]; if(!p) return;
+  if(elapsed===0) lastVoiceKey="";
   const lis=$("pSteps").querySelectorAll("li");
   let k=0;
   if(!inRest&&lis.length){
@@ -181,19 +189,34 @@ function updateSteps(){
 function renderVisual(k){
   const p=program[idx]; if(!p) return;
   const pA=$("pAnim"), p3=$("p3d");
-  const key=(inRest?"R":"")+idx+":"+k;
+  const key=(inRest?"R":"")+p.exId+":"+idx+":"+setIdx+":"+k;
+  const status=$("visualStatus"), retry=$("retry3d");
+  retry.hidden=true;
   if(animMode()==="3d" && !no3d && window.Player3D){
+    p3.style.display="";
     let ok=false;
     if(key!==lastPose3d){
       ok = inRest ? window.Player3D.rest(p3) : window.Player3D.show(p3, p.exId, k);
       if(ok) lastPose3d=key; else no3d=true;
     } else ok=true;
-    if(ok){ p3.style.display=""; pA.style.display="none"; pA.dataset.t=""; return; }
+    if(ok){
+      status.textContent="3D embermodell · formázott törzs és vállöv · v2";
+      pA.style.display="none"; pA.dataset.t=""; return;
+    }
   }
+  if(animMode()==="3d"){
+    const failed=no3d || window.player3dLoadState==="failed";
+    status.textContent=failed
+      ? "A 3D nem elérhető. Most a 2D segédábra látható."
+      : "A 3D embermodell betöltődik… Addig 2D segédábra látható.";
+    retry.hidden=!failed;
+  } else status.textContent=animMode()==="2d"
+    ? "2D segédábra · A térbeli testhez válaszd a 3D embermodellt."
+    : "Animáció kikapcsolva";
   // 2D figura vagy kikapcsolt animáció
   p3.style.display="none";
-  if(animMode()!=="off" && !inRest && window.renderAnim){
-    const t=window.ANIM_MAP ? (window.ANIM_MAP[p.exId]||"pulse") : "pulse";
+  if(animMode()!=="off" && window.renderAnim){
+    const t=inRest ? "breath" : (window.ANIM_MAP ? (window.ANIM_MAP[p.exId]||"pulse") : "pulse");
     if(pA.dataset.t!==t+idx){ window.renderAnim(pA,t); pA.dataset.t=t+idx; }
     pA.style.display="";
   } else { pA.style.display="none"; pA.dataset.t=""; }
@@ -231,7 +254,7 @@ function startAt(i, announce){
   if(announce) announceCurrent();
   if($("autoStep").checked) runTick(()=>nextSetOrNext());
   else { stopTick(); }
-  try{ navigator.wakeLock&&navigator.wakeLock.request("screen"); }catch{}
+  try{ navigator.wakeLock?.request("screen").catch(()=>{}); }catch{}
 }
 function nextSetOrNext(){
   // Automata módban egy kör lejárt: van még kör hátra?

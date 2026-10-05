@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gyógytorna Edzés</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=human-2">
 <script type="importmap">
 {"imports":{
   "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -85,6 +85,10 @@
     <h2 id="pName">Válassz programot</h2>
     <p id="pMeta"></p>
     <p id="pSet"></p>
+    <div class="visual-status">
+      <span id="visualStatus" role="status">3D embermodell betöltése…</span>
+      <button id="retry3d" type="button" hidden>3D újrapróbálása</button>
+    </div>
     <div id="pAnim" class="animbox"></div>
     <div id="p3d" class="animbox3d" style="display:none"></div>
     <div class="startpos" id="pStart" style="display:none"></div>
@@ -100,7 +104,7 @@
       <button id="btnRestart">↺ Újra</button>
       <label class="auto"><input type="checkbox" id="autoStep" checked> Automata léptetés</label>
       <label class="auto">🎬 <select id="animMode">
-        <option value="3d" selected>3D manöken</option>
+        <option value="3d" selected>3D embermodell</option>
         <option value="2d">2D figura</option>
         <option value="off">Animáció ki</option>
       </select></label>
@@ -123,7 +127,7 @@
 <script src="anim.js"></script>
 <script src="poses3d_1.js"></script>
 <script src="poses3d_2.js"></script>
-<script type="module" src="player3d.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=human-2"></script>
+<script src="load3d.js?v=human-2"></script>
 </body>
 </html>
