@@ -12,16 +12,20 @@ window.PLANNER = (function(){
     full:   {cim:"Teljes testes", desc:"Minden blokkból, ~30-40 perc.", fix:[], pool:[1,2,5,6,8,9,10,11,13,15,18,19,22,24,26,27]}
   };
 
-  // időkeret percekben -> cél gyakorlat-darabszám (bemelegítés + levezetés nélkül)
-  function targetCount(perc){ if(perc<=15) return 6; if(perc<=20) return 8; if(perc<=30) return 10; return 12; }
-
-  function generate(tipus, perc, withWarmup, onlyFree){
+  function generate(tipus, perc, withWarmup, onlyFree, setsOverride){
     const r = RECIPES[tipus] || RECIPES.quick;
-    let fix = poolOnly(r.fix, onlyFree);
-    let pool = shuffle(poolOnly(r.pool, onlyFree));
-    const n = targetCount(perc);
-    let ids = fix.slice();
-    for(const id of pool){ if(ids.length>=n) break; if(!ids.includes(id)) ids.push(id); }
+    const setsOf = id => setsOverride || window.exerciseSets(byId(id));
+    const cost = id => byId(id).becsultMp*setsOf(id) + setsOf(id)*10; // gyakorlat + körönkénti átállás
+    const warmCost = withWarmup ? window.WARMUP_GENERIC.reduce((t,w)=>t+w.becsultMp,0)+90+80 : 0;
+    const budget = Math.max(180, perc*60 - warmCost);
+    const cands = poolOnly(r.fix, onlyFree).concat(shuffle(poolOnly(r.pool, onlyFree)));
+    let ids=[], sum=0;
+    for(const id of cands){
+      if(!byId(id)||ids.includes(id)) continue;
+      if(ids.length>=1 && sum+cost(id)>budget) continue; // időkeretbe nem fér, jön a következő jelölt
+      ids.push(id); sum+=cost(id);
+      if(sum>=budget) break;
+    }
     // blokksorrend megtartása (edukált sorrend)
     ids.sort((a,b)=>a-b);
     // levezetés: Szfinx (16) mindig a végére, ha még nincs benne
@@ -29,10 +33,11 @@ window.PLANNER = (function(){
     return {tipus, cim:r.cim, ids, withWarmup, onlyFree, perc};
   }
 
-  function estimate(ids, withWarmup){
-    let s = ids.reduce((t,id)=>t+(byId(id)?byId(id).becsultMp:0),0);
+  function estimate(ids, withWarmup, setsOverride){
+    const setsOf = id => setsOverride || window.exerciseSets(byId(id));
+    let s = ids.reduce((t,id)=>t+(byId(id)?byId(id).becsultMp*setsOf(id):0),0);
     if(withWarmup) s += window.WARMUP_GENERIC.reduce((t,w)=>t+w.becsultMp,0) + 90; // + rövidített 1.blokk
-    s += ids.length*10; // átállás
+    s += ids.reduce((t,id)=>t+setsOf(id)*10,0); // átállás körönként
     return Math.round(s/60);
   }
 

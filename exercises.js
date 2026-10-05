@@ -33,3 +33,8 @@ window.EXERCISES = [
 {id:29,blokk:"Tigris, csúszkás",nev:"Tigris lábkörzéssel csúszkán",kiindulo:"Lebegő tigris, egyik láb alatt csúszka.",lepesek:["Hátra csúsztat, ívben oldalra, vissza.","Majd oldalra ki, ívben hátra, vissza.","Másik térd stabilan lebeg 1 cm-en."],ismetles:"5–5 kör irányonként",eszkoz:["csuszka"],oldal:"oldalankent",tartasMp:0,becsultMp:220,tts:"Tigris körzéssel. Nagy köröket rajzolsz a csúszkás lábbal, mindkét irányba."}
 ];
 window.ESZKOZ_LABEL = {kislabda:"kislabda",jogategla:"jógatégla",fitball:"fitball",miniband:"miniband",gumiszalag:"gumiszalag",bordasfal:"bordásfal",csuszka:"csúszka"};
+// Alap körszám gyakorlatonként: erősítőknél 3, nyújtó/mobilizáló/lazító gyakorlatoknál 1.
+// (A felhasználó az Összeállítóban globálisan felülírhatja: 1 / 2 / 3 kör.)
+window.EXERCISE_SETS = {2:1, 4:1, 16:1};
+window.exerciseSets = function(e){ return (e && window.EXERCISE_SETS[e.id]) || 3; };
+window.setsLabel = function(n){ return n>1 ? n+" kör × " : ""; };

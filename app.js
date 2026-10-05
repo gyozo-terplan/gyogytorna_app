@@ -40,6 +40,10 @@ function speak(text){
 }
 $("btnTestVoice").onclick=()=>speak("Sziasztok! Kezdjük a bemelegítést. Helyben járás, karlengetéssel.");
 
+// ---------- Körök (sorozatok) ----------
+function setsFor(e){ const o=parseInt($("setCount").value,10); return o>0 ? o : window.exerciseSets(e); }
+$("setCount").onchange=()=>{ renderManual(); buildFromManual(); previewAuto(); };
+
 // ---------- Lista + kézi ----------
 let manualSel = new Set((store.load()&&store.load().ids)||[1,5,9,13,18,26]);
 function eszkozBadge(e){
@@ -61,7 +65,7 @@ function renderManual(){
   const box=$("manualList"); box.innerHTML="";
   window.EXERCISES.filter(e=>!onlyFree||e.eszkoz.length===0).forEach(e=>{
     const l=document.createElement("label"); l.className="card";
-    l.innerHTML=`<input type="checkbox" data-id="${e.id}" ${manualSel.has(e.id)?"checked":""}> <span><b>${e.id}. ${e.nev}</b> <small>(${e.ismetles})</small> ${eszkozBadge(e)}</span>`;
+    l.innerHTML=`<input type="checkbox" data-id="${e.id}" ${manualSel.has(e.id)?"checked":""}> <span><b>${e.id}. ${e.nev}</b> <small>(${window.setsLabel(setsFor(e))}${e.ismetles})</small> ${eszkozBadge(e)}</span>`;
     l.querySelector("input").onchange=ev=>{ ev.target.checked? manualSel.add(e.id):manualSel.delete(e.id); buildFromManual(); };
     box.appendChild(l);
   });
@@ -72,8 +76,8 @@ $("manualAll").onclick=()=>{ window.EXERCISES.forEach(e=>{if(!$("manualFree").ch
 $("manualNone").onclick=()=>{ manualSel.clear(); renderManual(); buildFromManual(); };
 
 // ---------- Program építés ----------
-function toItemWarmup(w){ return {kind:"warmup", nev:w.nev+" (bemelegítés)", steps:w.lepesek, meta:w.ismetles, secs:w.becsultMp, tts:w.tts, eszkoz:[]}; }
-function toItemEx(e, warm){ return {kind:warm?"warmup":"ex", nev:e.nev+(warm?" (bemelegítés, rövidített)":""), steps:e.lepesek, meta:(warm?"rövidített • ":"")+e.ismetles, secs:warm?Math.max(45,Math.round(e.becsultMp/2)):e.becsultMp, tts:e.tts, eszkoz:e.eszkoz}; }
+function toItemWarmup(w){ return {kind:"warmup", nev:w.nev+" (bemelegítés)", kiindulo:"", steps:w.lepesek, meta:w.ismetles, secs:w.becsultMp, sets:1, tts:w.tts, eszkoz:[]}; }
+function toItemEx(e, warm){ const sets=warm?1:setsFor(e); return {kind:warm?"warmup":"ex", nev:e.nev+(warm?" (bemelegítés, rövidített)":""), kiindulo:e.kiindulo||"", steps:e.lepesek, meta:(warm?"rövidített • ":"")+window.setsLabel(sets)+e.ismetles, secs:warm?Math.max(45,Math.round(e.becsultMp/2)):e.becsultMp, sets, tts:e.tts, eszkoz:e.eszkoz}; }
 function warmupItems(){ return [...window.WARMUP_GENERIC.map(toItemWarmup), ...[1,2,3,4].map(id=>toItemEx(PLANNER.byId(id),true))]; }
 
 let program=[]; // {nev,steps,meta,secs,tts,eszkoz,kind}
@@ -101,10 +105,11 @@ function renderAuto(){
   });
 }
 function previewAuto(){
-  autoRes=PLANNER.generate(autoType, parseInt($("autoPerc").value,10), $("autoWarmup").checked, $("autoFree").checked);
+  const ov=parseInt($("setCount").value,10)||0;
+  autoRes=PLANNER.generate(autoType, parseInt($("autoPerc").value,10), $("autoWarmup").checked, $("autoFree").checked, ov);
   const ids=autoRes.ids;
-  const mins=PLANNER.estimate(ids, autoRes.withWarmup);
-  $("autoPreview").innerHTML=`<b>${autoRes.cim}</b> • ${ids.length} gyakorlat • kb. ${mins} perc ${autoRes.onlyFree?"• eszköz nélkül":""}<ol>${ids.map(id=>{const e=PLANNER.byId(id);return `<li>${e.nev} <small>(${e.ismetles})</small></li>`;}).join("")}</ol>`;
+  const mins=PLANNER.estimate(ids, autoRes.withWarmup, ov);
+  $("autoPreview").innerHTML=`<b>${autoRes.cim}</b> • ${ids.length} gyakorlat • kb. ${mins} perc ${autoRes.onlyFree?"• eszköz nélkül":""}<ol>${ids.map(id=>{const e=PLANNER.byId(id);const s=ov||window.exerciseSets(e);return `<li>${e.nev} <small>(${window.setsLabel(s)}${e.ismetles})</small></li>`;}).join("")}</ol>`;
 }
 ["autoPerc","autoWarmup","autoFree"].forEach(id=>$(id).onchange=previewAuto);
 $("btnShuffle").onclick=previewAuto;
@@ -116,22 +121,30 @@ $("btnAccept").onclick=()=>{
 };
 function renderProgram(){
   $("programList").innerHTML=program.map(p=>`<li>${p.nev} <small>(${p.meta})</small></li>`).join("");
-  const mins=Math.round(program.reduce((t,p)=>t+p.secs,0)/60);
+  const mins=Math.round(program.reduce((t,p)=>t+p.secs*p.sets,0)/60);
   $("programInfo").innerHTML=program.length? `<b>${program.length} tétel • kb. ${mins} perc</b>`:"Üres program.";
   $("navCount").textContent=program.length?`(${program.length})`:"";
 }
 $("btnStart").onclick=()=>{ if(!program.length)buildFromManual(); goTab("jatszo"); startAt(0,true); };
 
 // ---------- Lejátszó ----------
-let idx=0, remaining=0, tick=null, paused=false, inRest=false;
+let idx=0, setIdx=1, remaining=0, tick=null, paused=false, inRest=false, restKind="";
+const KOR_NEV=["","Első","Második","Harmadik","Negyedik","Ötödik"];
+function korNev(n){ return KOR_NEV[n]||`${n}.`; }
 function show(){
   const p=program[idx];
   if(!p){ $("pName").textContent="Válassz programot az Összeállítóban."; return; }
   $("progBar").style.width=((idx)/program.length*100)+"%";
-  $("progText").textContent=`${idx+1}. / ${program.length}${inRest?" • PIHENŐ":""}`;
-  $("pName").textContent=(inRest?"Pihenő — következő: ":"")+p.nev;
+  $("progText").textContent=`${idx+1}. / ${program.length}${inRest?(restKind==="set"?" • KÖRKÖZI PIHENŐ":" • PIHENŐ"):""}`;
+  if(inRest&&restKind==="set") $("pName").textContent="Körközi pihenő — "+p.nev;
+  else if(inRest) $("pName").textContent="Pihenő — következő: "+program[Math.min(idx+1,program.length-1)].nev;
+  else $("pName").textContent=p.nev;
   $("pMeta").textContent=p.meta+(p.eszkoz.length?` • Készítsd elő: ${p.eszkoz.map(k=>window.ESZKOZ_LABEL[k]).join(", ")}`:"");
-  $("pSteps").innerHTML="<ol>"+p.steps.map(s=>`<li>${s}</li>`).join("")+"</ol>";
+  $("pSet").textContent=p.sets>1?`${korNev(setIdx)} kör / ${p.sets}`:"";
+  const st=$("pStart");
+  if(!inRest&&p.kiindulo){ st.style.display=""; st.innerHTML=`<b>📍 Kiinduló helyzet:</b> ${p.kiindulo}`; }
+  else { st.style.display="none"; st.innerHTML=""; }
+  $("pSteps").innerHTML=inRest?"":"<ol>"+p.steps.map(s=>`<li>${s}</li>`).join("")+"</ol>";
   $("pTimer").textContent=fmt(remaining);
 }
 function fmt(s){ s=Math.max(0,Math.round(s)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; }
@@ -147,29 +160,55 @@ function runTick(onDone){
   },1000);
 }
 function announceCurrent(){
+  // Egyetlen összefűzött mondat: a darabolt speak() hívások szakították meg egymást (cancel).
   const p=program[idx];
-  speak(`${idx+1}. gyakorlat. ${p.nev}. ${p.tts}`);
-  if(p.eszkoz.length) setTimeout(()=>speak(`Készítsd elő: ${p.eszkoz.map(k=>window.ESZKOZ_LABEL[k]).join(", ")}`), 100);
+  const korTxt=p.sets>1?`${korNev(setIdx)} kör a ${p.sets}-ból. `:"";
+  const eszkozTxt=p.eszkoz.length?`Készítsd elő: ${p.eszkoz.map(k=>window.ESZKOZ_LABEL[k]).join(", ")}. `:"";
+  const startTxt=p.kiindulo?`Kiinduló helyzet: ${p.kiindulo}. `:"";
+  speak(`${idx+1}. gyakorlat. ${p.nev}. ${korTxt}${eszkozTxt}${startTxt}${p.tts}`);
+}
+function announceSet(){
+  const p=program[idx];
+  speak(`${korNev(setIdx)} kör. ${p.tts}`);
 }
 function startAt(i, announce){
   if(!program.length){ goTab("ossze"); return; }
-  idx=Math.max(0,Math.min(i,program.length-1)); inRest=false; paused=false; $("btnPause").textContent="⏸ Szünet";
+  idx=Math.max(0,Math.min(i,program.length-1)); setIdx=1;
+  inRest=false; restKind=""; paused=false; $("btnPause").textContent="⏸ Szünet";
   remaining=program[idx].secs; show();
   if(announce) announceCurrent();
-  if($("autoStep").checked) runTick(()=>goRestOrNext());
+  if($("autoStep").checked) runTick(()=>nextSetOrNext());
   else { stopTick(); }
   try{ navigator.wakeLock&&navigator.wakeLock.request("screen"); }catch{}
+}
+function nextSetOrNext(){
+  // Automata módban egy kör lejárt: van még kör hátra?
+  const p=program[idx];
+  if(setIdx<p.sets){
+    inRest=true; restKind="set"; remaining=5; show();
+    speak(`Pihenő. Jön a ${korNev(setIdx+1).toLowerCase()} kör.`);
+    runTick(()=>{ setIdx++; inRest=false; restKind=""; remaining=p.secs; show(); announceSet(); runTick(()=>nextSetOrNext()); });
+  } else goRestOrNext();
 }
 function goRestOrNext(){
   if(idx+1>=program.length){ speak("Gratulálok! Végeztél az edzéssel."); $("progBar").style.width="100%"; $("pName").textContent="✅ Kész!"; return; }
   const rest=parseInt($("restSec").value,10);
-  inRest=true; remaining=rest; show();
+  inRest=true; restKind="ex"; remaining=rest; show();
   speak(`Pihenő. Következő: ${program[idx+1].nev}.`);
-  runTick(()=>{ idx++; inRest=false; remaining=program[idx].secs; show(); announceCurrent(); runTick(()=>goRestOrNext()); });
+  runTick(()=>{ idx++; setIdx=1; inRest=false; restKind=""; remaining=program[idx].secs; show(); announceCurrent(); runTick(()=>nextSetOrNext()); });
 }
-$("btnNext").onclick=()=>{ speechSynthesis&&speechSynthesis.cancel(); stopTick(); if(idx+1<program.length){startAt(idx+1,true);} };
-$("btnPrev").onclick=()=>{ speechSynthesis&&speechSynthesis.cancel(); stopTick(); startAt(idx-1,true); };
-$("btnRestart").onclick=()=>startAt(idx,true);
+function nextPress(){
+  // Kézi léptetés: előbb a hátralévő körök, aztán a következő gyakorlat.
+  if(!program.length) return;
+  speechSynthesis&&speechSynthesis.cancel(); stopTick();
+  const p=program[idx];
+  if(setIdx<p.sets){ setIdx++; inRest=false; restKind=""; remaining=p.secs; show(); announceSet(); if($("autoStep").checked) runTick(()=>nextSetOrNext()); }
+  else if(idx+1<program.length){ startAt(idx+1,true); }
+  else { speak("Gratulálok! Végeztél az edzéssel."); $("progBar").style.width="100%"; $("pName").textContent="✅ Kész!"; }
+}
+$("btnNext").onclick=nextPress;
+$("btnPrev").onclick=()=>{ speechSynthesis&&speechSynthesis.cancel(); stopTick(); startAt(Math.max(0,idx-1),true); };
+$("btnRestart").onclick=()=>{ if(!program.length) return; stopTick(); inRest=false; restKind=""; remaining=program[idx].secs; show(); announceSet(); if($("autoStep").checked) runTick(()=>nextSetOrNext()); };
 $("btnSpeak").onclick=()=>announceCurrent();
 $("btnPause").onclick=()=>{ paused=!paused; $("btnPause").textContent=paused?"▶ Folytatás":"⏸ Szünet"; if(paused)speechSynthesis&&speechSynthesis.cancel(); };
 

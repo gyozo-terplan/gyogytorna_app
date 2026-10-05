@@ -32,6 +32,14 @@
   <div class="toolbar">
     <label><input type="checkbox" id="withWarmup" checked> Bemelegítéssel indul</label>
     <label><input type="checkbox" id="manualFree"> Csak eszköz nélküliek</label>
+    <label>Körök:
+      <select id="setCount">
+        <option value="0" selected>Alapértelmezett</option>
+        <option value="1">1 kör</option>
+        <option value="2">2 kör</option>
+        <option value="3">3 kör</option>
+      </select>
+    </label>
     <button id="manualAll">Mind kijelöl</button>
     <button id="manualNone">Törlés</button>
   </div>
@@ -70,6 +78,8 @@
     <p id="progText"></p>
     <h2 id="pName">Válassz programot</h2>
     <p id="pMeta"></p>
+    <p id="pSet"></p>
+    <div class="startpos" id="pStart" style="display:none"></div>
     <div id="pSteps"></div>
     <div class="timer" id="pTimer">–</div>
     <div class="controls">
