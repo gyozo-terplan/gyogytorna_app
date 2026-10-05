@@ -144,6 +144,7 @@ function korNev(n){ return KOR_NEV[n]||`${n}.`; }
 function show(){
   const p=program[idx];
   if(!p){ $("pName").textContent="Válassz programot az Összeállítóban."; return; }
+  lastVoiceKey="";
   $("progBar").style.width=((idx)/program.length*100)+"%";
   $("progText").textContent=`${idx+1}. / ${program.length}${inRest?(restKind==="set"?" • KÖRKÖZI PIHENŐ":" • PIHENŐ"):""}`;
   if(inRest&&restKind==="set") $("pName").textContent="Körközi pihenő — "+p.nev;
@@ -159,7 +160,7 @@ function show(){
   $("pTimer").classList.remove("urgent");
   updateSteps();
 }
-let elapsed=0;
+let elapsed=0, lastVoiceKey="";
 function updateSteps(){
   const p=program[idx]; if(!p) return;
   const lis=$("pSteps").querySelectorAll("li");
@@ -169,6 +170,12 @@ function updateSteps(){
     k=Math.min(lis.length-1,Math.floor(elapsed/per));
     lis.forEach((li,i)=>li.classList.toggle("active",i===k));
   } else lis.forEach(li=>li.classList.remove("active"));
+  // Figura + szöveg + hang egyszerre: lépésváltáskor a lépés szövege is elhangzik.
+  // (k=0-t a gyakorlat-indító bemondás fedi, a visszaszámlálás utolsó 3 mp-ébe nem szólunk bele.)
+  if(!inRest && k>0 && remaining>3 && $("voiceOn").checked && ("speechSynthesis" in window)){
+    const vk=idx+":"+setIdx+":"+k;
+    if(vk!==lastVoiceKey){ lastVoiceKey=vk; speak(p.steps[k]); }
+  }
   renderVisual(k);
 }
 function renderVisual(k){

@@ -52,38 +52,56 @@ function limb(r, len, mat){
   return m;
 }
 function buildRig(){
-  const mat = new THREE.MeshStandardMaterial({ color:0x0e6e5c, roughness:0.75 });
-  const dark = new THREE.MeshStandardMaterial({ color:0x0a4a49, roughness:0.8 });
+  // Emberszerű manöken: ruha (trikó/nadrág) + bőrszín elkülönítéssel,
+  // látható vállövvel (kulcscsont + deltoid + trapézizom).
+  const cloth = new THREE.MeshStandardMaterial({ color:0x0e6e5c, roughness:0.75 });
+  const clothD = new THREE.MeshStandardMaterial({ color:0x0a4a49, roughness:0.8 });
+  const skin = new THREE.MeshStandardMaterial({ color:0xe8b98a, roughness:0.7 });
   const R = {};
   const root = new THREE.Group(); root.position.set(0,0.95,0); R.root = root;
-  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 16), mat);
+  // medence / nadrág
+  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 16), clothD);
   pelvis.scale.set(1.15, 0.8, 0.9); root.add(pelvis);
   const mk = (parent, x,y,z) => { const g = new THREE.Group(); g.position.set(x,y,z); parent.add(g); return g; };
   R.spine = mk(root, 0,0.10,0);
-  const belly = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.12, 6, 12), mat);
+  const belly = new THREE.Mesh(new THREE.CapsuleGeometry(0.105, 0.12, 6, 12), cloth);
   belly.position.y = 0.08; R.spine.add(belly);
   R.chest = mk(R.spine, 0,0.22,0);
-  const chest = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.16, 6, 12), mat);
-  chest.position.y = 0.10; R.chest.add(chest);
+  // mellkas: szélesebb, laposabb (emberi torzó)
+  const chest = new THREE.Mesh(new THREE.SphereGeometry(0.14, 20, 16), cloth);
+  chest.scale.set(1.25, 1.05, 0.8); chest.position.y = 0.10; R.chest.add(chest);
+  // trapézizom: nyaktól a vállakig futó sáv
+  const trap = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.07, 0.11), cloth);
+  trap.position.y = 0.20; R.chest.add(trap);
+  // kulcscsont
+  const clav = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.30, 4, 10), clothD);
+  clav.rotation.z = Math.PI/2; clav.position.y = 0.185; R.chest.add(clav);
   R.neck = mk(R.chest, 0,0.24,0);
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.08,12), dark);
-  neck.position.y = 0.04; R.neck.add(neck);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 20, 16), new THREE.MeshStandardMaterial({ color:0xe8b98a, roughness:0.7 }));
-  head.position.y = 0.16; R.neck.add(head);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.055,0.09,12), skin);
+  neck.position.y = 0.045; R.neck.add(neck);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.115, 22, 18), skin);
+  head.position.y = 0.175; R.neck.add(head);
   for(const s of ["L","R"]){
     const sx = s==="L" ? 1 : -1;
-    const sh = mk(R.chest, 0.24*sx, 0.16, 0); R["sh"+s] = sh;
-    const ua = limb(0.045, 0.22, mat); sh.add(ua);
+    const sh = mk(R.chest, 0.24*sx, 0.18, 0); R["sh"+s] = sh;
+    // deltoid (vállizom sapka) — ettől lesz látható válla
+    const delt = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 12), cloth);
+    sh.add(delt);
+    const ua = limb(0.05, 0.20, cloth); sh.add(ua); // felkar (ujj)
     const el = mk(sh, 0,-0.30,0); R["el"+s] = el;
-    const fa = limb(0.04, 0.20, mat); el.add(fa);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 10), dark);
-    hand.position.y = -0.30; el.add(hand);
+    const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 10), skin);
+    el.add(elbow);
+    const fa = limb(0.042, 0.18, skin); el.add(fa); // alkar (bőr)
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.052, 12, 10), skin);
+    hand.position.y = -0.30; hand.scale.set(0.9, 1.2, 0.9); el.add(hand);
     const hip = mk(root, 0.11*sx, -0.04, 0); R["hip"+s] = hip;
-    const th = limb(0.07, 0.30, mat); hip.add(th);
+    const th = limb(0.075, 0.28, clothD); hip.add(th); // comb (nadrág)
     const knee = mk(hip, 0,-0.44,0); R["knee"+s] = knee;
-    const sh2 = limb(0.055, 0.30, mat); knee.add(sh2);
-    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.09,0.06,0.22), dark);
-    foot.position.set(0,-0.45,0.06); knee.add(foot);
+    const kneecap = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 10), skin);
+    kneecap.position.z = 0.02; knee.add(kneecap);
+    const sh2 = limb(0.055, 0.28, skin); knee.add(sh2); // lábszár (bőr)
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.095,0.06,0.24), clothD);
+    foot.position.set(0,-0.45,0.07); knee.add(foot);
   }
   return R;
 }
